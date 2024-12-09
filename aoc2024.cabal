@@ -52,7 +52,7 @@ extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
 
 common shared
-    ghc-options: -O2 -Wall -fspecialise 
+    ghc-options: -O2 -Wall -fspecialise -fspecialise-aggressively -fexpose-all-unfoldings -flate-specialise
     -- Base language which the package is written in.
     default-language: GHC2021
 
@@ -233,3 +233,11 @@ executable 08
     -- Directories containing source files.
     hs-source-dirs:   08
 
+executable 09
+    import:           shared
+    main-is:          Main.hs
+    build-depends:    
+        base ^>=4.19.1.0,
+        containers,
+        vector,
+    hs-source-dirs:   09
