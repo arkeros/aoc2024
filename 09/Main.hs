@@ -2,19 +2,18 @@ module Main where
 
 import Control.Monad (forM_, liftM2, when)
 import Control.Monad.ST
+import Data.Function (on)
 import Data.List (partition)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.List.NonEmpty qualified as NE
-import Data.Maybe (fromMaybe, isJust, listToMaybe)
-import Data.STRef (modifySTRef', newSTRef, readSTRef)
+import Data.Maybe (fromMaybe, isJust)
+import Data.STRef (modifySTRef', newSTRef, readSTRef, writeSTRef)
 import Data.Vector qualified as V
 import Data.Vector.Mutable qualified as MV
 
 type FileID = Int
 type Block = Maybe FileID
 type Input = [Int]
-
-safeHead = listToMaybe
 
 whileM_ :: (Monad m) => m Bool -> m () -> m ()
 whileM_ cond m = do
@@ -23,20 +22,6 @@ whileM_ cond m = do
 
 indexedGroup :: (Eq a) => [a] -> [(a, NonEmpty Int)]
 indexedGroup = map ((,) <$> snd . NE.head <*> fmap fst) . NE.groupWith snd . zip [0 ..]
-
--- Replace the first occurrence of `a` with `a'` in the list
-replaceFirst :: (Eq a) => a -> a -> [a] -> [a]
-replaceFirst _ _ [] = []
-replaceFirst a a' (x : xs)
-  | x == a = a' : xs
-  | otherwise = x : replaceFirst a a' xs
-
--- Remove from the list the first element that satisfies the predicate
-removeFirst :: (Eq a) => a -> [a] -> [a]
-removeFirst _ [] = []
-removeFirst a (x : xs)
-  | x == a = xs
-  | otherwise = x : removeFirst a xs
 
 parseInput :: String -> Input
 parseInput = fmap (read . pure)
@@ -53,10 +38,10 @@ hydrate = go True 0
   go False id_ (x : xs) = replicate x Nothing <> go True (id_ + 1) xs
 
 solve1 :: Input -> Int
-solve1 = checksum . amphipod . hydrate
+solve1 = checksum . defrag . hydrate
  where
-  amphipod :: [Block] -> [Block]
-  amphipod xs = runST $ do
+  defrag :: [Block] -> [Block]
+  defrag xs = runST $ do
     let n = length xs
     i <- newSTRef 0
     j <- newSTRef (n - 1)
@@ -74,31 +59,38 @@ solve1 = checksum . amphipod . hydrate
     V.toList <$> V.freeze v
 
 solve2 :: Input -> Int
-solve2 = checksum . amphipod . hydrate
+solve2 = checksum . defrag . hydrate
  where
-  amphipod :: [Block] -> [Block]
-  amphipod xs = runST $ do
+  defrag :: [Block] -> [Block]
+  defrag xs = runST $ do
     v <- V.thaw . V.fromList $ xs
     let (fs, ss) = partition (isJust . fst) . indexedGroup $ xs
         files :: [NonEmpty Int] = snd <$> fs
-    spaces' <- newSTRef (snd <$> ss)
+    spacesRef <- newSTRef (snd <$> ss)
     forM_ (reverse files) $ \file -> do
-      -- find the first space that is larger than the file
-      spaces <- readSTRef spaces'
-      case safeHead . filter (isLargerThan file) . takeWhile (isBefore file) $ spaces of
-        Just space -> do
-          forM_ (NE.zip space file) (uncurry (MV.swap v))
-          if NE.length space == NE.length file
-            -- remove the space
-            then modifySTRef' spaces' (removeFirst space)
-            -- just make the space smaller
-            else do
-              let space' = NE.fromList . NE.drop (NE.length file) $ space
-              modifySTRef' spaces' (replaceFirst space space')
-        Nothing -> pure ()
+      spaces <- readSTRef spacesRef
+      spaces' <- compact file spaces $ \space -> forM_ (NE.zip space file) (uncurry (MV.swap v))
+      writeSTRef spacesRef spaces'
     V.toList <$> V.freeze v
-  isLargerThan xs = (>= NE.length xs) . NE.length
-  isBefore xs = (< NE.head xs) . NE.head
+
+  -- Find the first space that is larger than the file
+  compact :: NonEmpty Int -> [NonEmpty Int] -> (NonEmpty Int -> ST s ()) -> ST s [NonEmpty Int]
+  compact _ [] _ = pure []
+  compact file xs@(space : rest) action
+    -- We are looking after the file, so we can stop
+    | file `isAfter` space = pure xs
+    | otherwise = case (compare `on` NE.length) space file of
+        -- We found a space that is exactly the same size as the file, so we can use it and delete it
+        EQ -> action space >> pure rest
+        -- We found a space that is larger than the file, so we can use it and split it
+        GT -> do
+          action space
+          let space' = NE.fromList . NE.drop (NE.length file) $ space
+          pure $ space' : rest
+        -- Recursion step
+        LT -> (space :) <$> compact file rest action
+
+  isAfter xs = (> NE.head xs) . NE.head
 
 main :: IO ()
 main = do
