@@ -241,3 +241,12 @@ executable 09
         containers,
         vector,
     hs-source-dirs:   09
+
+executable 10
+    import:           shared
+    main-is:          Main.hs
+    build-depends:    
+        base ^>=4.19.1.0,
+        containers,
+        array,
+    hs-source-dirs:   10
