@@ -5,7 +5,8 @@ import Data.Array
 import Data.Containers.ListUtils (nubOrd)
 import Data.List (singleton)
 
-type Input = Array (Int, Int) Int
+type Index = (Int, Int)
+type Input = Array Index Int
 
 parseInput :: String -> Input
 parseInput str = listArray ((0, 0), (n - 1, m - 1)) $ concat rows
@@ -14,31 +15,31 @@ parseInput str = listArray ((0, 0), (n - 1, m - 1)) $ concat rows
   n = length rows
   m = length . head $ rows
 
-neighbors :: Input -> (Int, Int) -> [(Int, Int)]
-neighbors input (i, j) = filter inBounds [(i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)]
- where
-  inBounds = inRange (bounds input)
-
-solve :: ([(Int, Int)] -> Int) -> Input -> Int
+solve :: ([Index] -> Int) -> Input -> Int
 solve f input = sum (score <$> trailHeads)
  where
   maxHeight = 9
-  trailHeads = do
-    ix <- indices input
-    guard $ input ! ix == 0
-    return ix
+  trailHeads :: [Index]
+  trailHeads = [ix | (ix, val) <- assocs input, val == 0]
+  walk :: Index -> [Index]
   walk ix =
     if input ! ix == maxHeight
-      then return ix
+      then pure ix
       else do
-        ix' <- neighbors input ix
+        ix' <- neighbors ix
         guard $ input ! ix' == input ! ix + 1
-        return ix'
-  score :: (Int, Int) -> Int
+        pure ix'
+  neighbors :: Index -> [Index]
+  neighbors (i, j) = filter inBounds [(i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)]
+  inBounds :: Index -> Bool
+  inBounds = inRange (bounds input)
+  score :: Index -> Int
   score = f . (!! maxHeight) . iterate (>>= walk) . singleton
 
 solve1 :: Input -> Int
-solve1 = solve (length . nubOrd)
+solve1 = solve countUnique
+ where
+  countUnique = length . nubOrd
 
 solve2 :: Input -> Int
 solve2 = solve length
