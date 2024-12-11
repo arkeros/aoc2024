@@ -9,7 +9,10 @@ parseInput :: String -> Input
 parseInput = map read . words
 
 nDigits :: Int -> Int
-nDigits = length . show
+nDigits n = floor $ log10 (fromIntegral n) + 1
+ where
+  log10 :: Float -> Float
+  log10 = logBase 10
 
 pairToList :: (a, a) -> [a]
 pairToList (x, y) = [x, y]
