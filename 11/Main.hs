@@ -19,7 +19,7 @@ pairToList (x, y) = [x, y]
 
 -- 2024 -> (20, 24), 99 -> (9, 9)
 splitInHalf :: Int -> (Int, Int)
-splitInHalf n = divMod n (10 ^ (nDigits n `div` 2))
+splitInHalf n = n `divMod` (10 ^ (nDigits n `div` 2))
 
 blink :: Int -> [Int]
 blink 0 = [1]
