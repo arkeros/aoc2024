@@ -1,7 +1,7 @@
 module Main where
 
-import Data.IntMap (IntMap)
-import Data.IntMap qualified as IntMap
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IntMap
 
 type Input = [Int]
 
