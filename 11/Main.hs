@@ -40,11 +40,11 @@ count = foldr (\x -> IntMap.insertWith (+) x 1) IntMap.empty
 blink' :: (Int, Int) -> [(Int, Int)]
 blink' (x, counter) = (,counter) <$> blink x
 
-fromList :: [(Int, Int)] -> Counter
-fromList = foldr (\(x, y) -> IntMap.insertWith (+) x y) IntMap.empty
-
 solve' :: Int -> [Int] -> Int
-solve' n = sum . (!! n) . iterate (fromList . (>>= blink') . IntMap.toList) . count
+solve' n = sum . (!! n) . iterate (fromList . (>>= blink') . toList) . count
+ where
+  fromList = IntMap.fromListWith (+)
+  toList = IntMap.toList
 
 solve1 :: [Int] -> Int
 solve1 = solve' 25
