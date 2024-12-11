@@ -1,17 +1,18 @@
 module Main where
 
 import Control.Monad (guard)
-import Data.Array
+import Data.Array.Unboxed
+import Data.Char (digitToInt)
 import Data.Containers.ListUtils (nubOrd)
 import Data.List (singleton)
 
 type Index = (Int, Int)
-type Input = Array Index Int
+type Input = UArray Index Int
 
 parseInput :: String -> Input
-parseInput str = listArray ((0, 0), (n - 1, m - 1)) $ concat rows
+parseInput str = listArray ((0, 0), (n - 1, m - 1)) . concat $ rows
  where
-  rows :: [[Int]] = fmap (read . singleton) <$> lines str
+  rows :: [[Int]] = fmap digitToInt <$> lines str
   n = length rows
   m = length . head $ rows
 
@@ -22,15 +23,12 @@ solve f input = sum (score <$> trailHeads)
   trailHeads :: [Index]
   trailHeads = [ix | (ix, val) <- assocs input, val == 0]
   walk :: Index -> [Index]
-  walk ix =
-    if input ! ix == maxHeight
-      then pure ix
-      else do
-        ix' <- neighbors ix
-        guard $ input ! ix' == input ! ix + 1
-        pure ix'
+  walk !ix = do
+    ix' <- neighbors ix
+    guard $ input ! ix' == input ! ix + 1
+    pure ix'
   neighbors :: Index -> [Index]
-  neighbors (i, j) = filter inBounds [(i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)]
+  neighbors (!i, !j) = filter inBounds [(i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)]
   inBounds :: Index -> Bool
   inBounds = inRange (bounds input)
   score :: Index -> Int
