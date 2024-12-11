@@ -250,3 +250,12 @@ executable 10
         containers,
         array,
     hs-source-dirs:   10
+
+executable 11
+    import:           shared
+    main-is:          Main.hs
+    build-depends:    
+        base ^>=4.19.1.0,
+        containers,
+    hs-source-dirs:   11
+
