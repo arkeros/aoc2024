@@ -31,16 +31,16 @@ blink n =
 solve :: Int -> [Int] -> Int
 solve n = length . (!! n) . iterate (>>= blink)
 
-count :: [Int] -> IntMap Int
+type Counter = IntMap Int
+
+count :: [Int] -> Counter
 count = foldr (\x -> IntMap.insertWith (+) x 1) IntMap.empty
 
 -- blink, but with count on the right
 blink' :: (Int, Int) -> [(Int, Int)]
 blink' (x, counter) = (,counter) <$> blink x
 
--- solve :: Int -> Input -> Int
-
-fromList :: [(Int, Int)] -> IntMap Int
+fromList :: [(Int, Int)] -> Counter
 fromList = foldr (\(x, y) -> IntMap.insertWith (+) x y) IntMap.empty
 
 solve' :: Int -> [Int] -> Int
