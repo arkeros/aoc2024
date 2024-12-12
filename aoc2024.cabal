@@ -259,3 +259,13 @@ executable 11
         containers,
     hs-source-dirs:   11
 
+executable 12
+    import:           shared
+    main-is:          Main.hs
+    build-depends:    
+        base ^>=4.19.1.0,
+        containers,
+        array,
+        transformers,
+        mtl,
+    hs-source-dirs:   12
