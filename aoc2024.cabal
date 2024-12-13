@@ -269,3 +269,11 @@ executable 12
         transformers,
         mtl,
     hs-source-dirs:   12
+
+executable 13
+    import:           shared
+    main-is:          Main.hs
+    build-depends:    
+        base ^>=4.19.1.0,
+        megaparsec,
+    hs-source-dirs:   13
