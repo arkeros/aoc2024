@@ -54,7 +54,7 @@ solve1 :: Input -> Int
 solve1 = sum . map cost . mapMaybe solveMachine
 
 solve2 :: Input -> Int
-solve2 = sum . map cost . mapMaybe solveMachine . map adjustMachine
+solve2 = solve1 . map adjustMachine
  where
   offset = 10000000000000
   adjustMachine :: Machine -> Machine
