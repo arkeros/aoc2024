@@ -277,3 +277,14 @@ executable 13
         base ^>=4.19.1.0,
         megaparsec,
     hs-source-dirs:   13
+
+executable 14
+    import:           shared
+    main-is:          Main.hs
+    build-depends:    
+        base ^>=4.19.1.0,
+        megaparsec,
+        linear,
+        containers,
+        lens,
+    hs-source-dirs:   14
