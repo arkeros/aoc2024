@@ -29,7 +29,7 @@ count = map ((,) <$> NE.head <*> length) . NE.group . sort
 countBy :: (Ord b) => (a -> b) -> [a] -> [(b, Int)]
 countBy f = count . map f
 
-(^%^) :: (Integral a) => V2 a -> V2 a -> V2 a
+(^%^) :: (Integral a, Applicative f) => f a -> f a -> f a
 (^%^) = liftA2 mod
 
 vectorP :: Parser (V2 Int)
