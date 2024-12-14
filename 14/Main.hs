@@ -68,10 +68,10 @@ solve2 = takeWhile ((< period) . fst) . filter ((hasALongVertical <> hasLongHori
   step :: Robot -> Robot
   step = (,) <$> walk 1 <*> snd
   hasLong :: (Robot -> Int) -> [Robot] -> Bool
-  hasLong f = any ((>= 30) . snd) . countBy f
+  hasLong f = any ((>= 20) . snd) . countBy f
   hasALongVertical = hasLong (^. _1 . _x)
   hasLongHorizontal = hasLong (^. _1 . _y)
-  period = 101 * 103
+  period = lcm (bounds ^. _x) (bounds ^. _y)
 
 showRobots :: [Robot] -> String
 showRobots = showMap . M.fromList . countBy fst
