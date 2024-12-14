@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Concurrent (threadDelay)
 import Control.Lens
 import Control.Monad (forM_)
 import Data.List (sort)
@@ -7,7 +8,6 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map qualified as M
 import Data.Maybe (isJust)
 import Data.Void (Void)
-
 import Linear.V2
 import Linear.Vector ((*^))
 import Text.Megaparsec hiding (count)
@@ -97,3 +97,4 @@ main = do
       forM_ (solve2 x) $ \(i, xs) -> do
         putStrLn $ "After " <> show i <> " seconds:"
         putStrLn $ showRobots xs
+        threadDelay 100_000 -- 100 ms
