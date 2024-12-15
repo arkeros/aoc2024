@@ -2,7 +2,7 @@ module Main where
 
 import Control.Lens
 import Control.Monad (forM, forM_, when)
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Data.Array.Unboxed
 import Data.Bifunctor (Bifunctor (..))
 import Data.Map (Map)
@@ -14,14 +14,15 @@ import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
-data Object = Wall | Box | Robot
+data Object = Wall | Box | BigBox | Robot
   deriving (Eq, Show, Ord)
 
 data Direction = North | South | East | West
   deriving (Eq, Show, Ord)
 
+type Grid = Map Coordinates Object
 type Coordinates = V2 Int
-type Input = (Map Coordinates Object, [Direction])
+type Input = (Grid, [Direction])
 type Parser = Parsec Void String
 
 dir :: Direction -> Coordinates
@@ -66,31 +67,56 @@ inputP = do
   directions <- some directionP `sepEndBy` newline
   pure (objects, mconcat directions)
 
-swap :: (Coordinates, Coordinates) -> State (Map Coordinates Object) ()
+swap :: (Coordinates, Coordinates) -> State Grid ()
 swap (src, dest) = do
   mObj <- gets $ M.lookup src
   case mObj of
-    Nothing -> error "No object to move"
+    Nothing -> pure ()
     Just obj -> do
       modify $ M.delete src
       modify $ M.insert dest obj
 
-move :: (Coordinates, Direction) -> State (Map Coordinates Object) Bool
+getObjAt :: Coordinates -> State Grid (Coordinates, Maybe Object)
+getObjAt pos = do
+  let leftPost = pos + dir West
+  (l, x) <- (,) <$> gets (M.lookup leftPost) <*> gets (M.lookup pos)
+  pure $
+    if x == Nothing && l == Just BigBox
+      then (leftPost, Just BigBox)
+      else (pos, x)
+
+blockingPos :: Coordinates -> Direction -> [Coordinates]
+blockingPos pos West = [pos]
+blockingPos pos East = [pos + dir East, pos]
+blockingPos pos direction = [pos + dir East, pos]
+
+move :: (Coordinates, Direction) -> State Grid Bool
 move (pos, direction) = do
-  objects <- get
+  (myPos, moi) <- getObjAt pos
   let pos' = pos + dir direction
-  case M.lookup pos' objects of
-    Just Wall -> pure False
-    Just Box -> do
-      moved <- move (pos', direction)
+  obj <-
+    if moi == Just BigBox && direction == East
+      then getObjAt (myPos + dir East + dir East)
+      else getObjAt pos'
+  case obj of
+    (_, Just Wall) -> pure False
+    (objPos, Just Box) -> do
+      moved <- move (objPos, direction)
       when moved $ swap (pos, pos')
       pure moved
-    Just Robot -> error "Robot should not be in the way"
-    Nothing -> do
+    (bigBoxPos, Just BigBox) -> do
+      originalState <- get
+      moved <- and <$> forM (blockingPos bigBoxPos direction) (move . (,direction))
+      if moved
+        then swap (pos, pos')
+        else put originalState
+      pure moved
+    (_, Just Robot) -> error "Robot should not be in the way"
+    (_, Nothing) -> do
       swap (pos, pos')
       pure True
 
-moveRobot :: Direction -> State (Coordinates, Map Coordinates Object) Bool
+moveRobot :: Direction -> State (Coordinates, Grid) Bool
 moveRobot !direction = do
   pos <- use _1
   moved <- zoom _2 $ move (pos, direction)
@@ -99,30 +125,51 @@ moveRobot !direction = do
     _1 .= pos'
   pure moved
 
-gps :: Coordinates -> Int
-gps (V2 x y) = 100 * x + y
-
 debug :: Input -> String
 debug (!objectMap, dirs) = unlines . evalState moveAll $ initialState
  where
   initialState = (findRobot objectMap, objectMap)
   positions obj = ifolded . filtered (== obj) . asIndex
+  countBigBoxes :: Grid -> Int
+  countBigBoxes = length . toListOf (positions BigBox)
+
   findRobot = fromMaybe (error "No robot found") . preview (positions Robot)
   moveAll = forM dirs $ \dir -> do
+    nBigBoxes <- use (_2 . to countBigBoxes)
     _ <- moveRobot dir
     objs <- use _2
-    pure $ "Move " <> show dir <> ":\n" <> showMap objs <> "\n"
+    let nBigBoxes' = countBigBoxes objs
+    let msg = if nBigBoxes' /= nBigBoxes then "invariant violation!\n" else ""
+    pure $ "Move " <> show dir <> ":\n" <> showMap objs <> "\n" <> msg
+
+gps :: Coordinates -> Int
+gps (V2 x y) = 100 * x + y
 
 solve1 :: Input -> Int
 solve1 (!objMap, dirs) = sumOf (_2 . positions Box . to gps) final
  where
   initial = (findRobot objMap, objMap)
   final = execState (forM_ dirs moveRobot) initial
-  positions obj = ifolded . filtered (== obj) . asIndex
+  -- finds all the coordinates of a given type of object
+  positions objType = ifolded . filtered (== objType) . asIndex
   findRobot = fromMaybe (error "No robot found") . preview (positions Robot)
 
+scaleUp :: Grid -> Grid
+scaleUp = M.fromList . (>>= enlarge) . M.toList
+ where
+  enlarge (V2 x y, Wall) = [(V2 x (2 * y), Wall), (V2 x (2 * y + 1), Wall)]
+  enlarge (V2 x y, Box) = [(V2 x (2 * y), BigBox)]
+  enlarge (V2 x y, obj) = [(V2 x (2 * y), obj)]
+
 solve2 :: Input -> Int
-solve2 = undefined
+solve2 (!objMap, dirs) = sumOf (_2 . positions BigBox . to gps) final
+ where
+  objMap' = scaleUp objMap
+  initial = (findRobot objMap', objMap')
+  final = execState (forM_ dirs moveRobot) initial
+  -- finds all the coordinates of a given type of object
+  positions objType = ifolded . filtered (== objType) . asIndex
+  findRobot = fromMaybe (error "No robot found") . preview (positions Robot)
 
 showMap :: Map Coordinates Object -> String
 showMap m =
@@ -134,6 +181,7 @@ showMap m =
   showObject :: Object -> Char
   showObject Wall = '#'
   showObject Box = 'O'
+  showObject BigBox = '['
   showObject Robot = '@'
   maxX = maximum . map (view _x) $ M.keys m
   maxY = maximum . map (view _y) $ M.keys m
@@ -146,4 +194,6 @@ main = do
     Right x -> do
       print x
       -- putStrLn $ debug x
+      -- putStrLn $ debug (first scaleUp x)
       print $ solve1 x
+      print $ solve2 x
