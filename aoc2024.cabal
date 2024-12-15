@@ -288,3 +288,17 @@ executable 14
         containers,
         lens,
     hs-source-dirs:   14
+
+executable 15
+    import:           shared
+    main-is:          Main.hs
+    build-depends:    
+        base ^>=4.19.1.0,
+        megaparsec,
+        linear,
+        containers,
+        lens,
+        array,
+        mtl,
+        transformers,
+    hs-source-dirs:   15
