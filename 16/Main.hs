@@ -8,8 +8,10 @@ import Data.Containers.ListUtils (nubOrd)
 import Data.Graph
 import Data.Heap (Heap)
 import Data.Heap qualified as Heap
-import Data.Map (Map)
-import Data.Map qualified as Map
+import Data.IntMap (IntMap)
+import Data.IntMap qualified as IntMap
+import Data.IntSet (IntSet)
+import Data.IntSet qualified as IntSet
 import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
@@ -89,19 +91,29 @@ move South (x, y) = (x + 1, y)
 move East (x, y) = (x, y + 1)
 move West (x, y) = (x, y - 1)
 
-(∈) :: (Ord a) => a -> Set a -> Bool
-(∈) = Set.member
+class BelongsTo t a where
+  (∈) :: a -> t -> Bool
+  (∉) :: a -> t -> Bool
 
-(∉) :: (Ord a) => a -> Set a -> Bool
-(∉) = Set.notMember
+instance (Eq a) => BelongsTo [a] a where
+  (∈) = elem
+  (∉) = notElem
 
-(!??) :: (Ord k) => Map k (Distance a) -> k -> Distance a
-(!??) m k = Map.findWithDefault Infinity k m
+instance (Ord a) => BelongsTo (Set a) a where
+  (∈) = Set.member
+  (∉) = Set.notMember
 
-type Distances = Map Vertex (Distance Int)
+instance BelongsTo IntSet IntSet.Key where
+  (∈) = IntSet.member
+  (∉) = IntSet.notMember
+
+(!??) :: IntMap (Distance a) -> IntMap.Key -> Distance a
+(!??) m k = IntMap.findWithDefault Infinity k m
+
+type Distances = IntMap (Distance Int)
 type Queue = Heap (Heap.Entry (Distance Int) Vertex)
-type ParentsMap = Map Vertex [Vertex]
-type DijkstraState = (Set Vertex, Distances, Queue, ParentsMap)
+type ParentsMap = IntMap [Vertex]
+type DijkstraState = (IntSet, Distances, Queue, ParentsMap)
 type CostFn = Edge -> Distance Int
 type Key = (Coordinates, Direction)
 
@@ -109,10 +121,10 @@ dijkstra :: Graph -> CostFn -> Vertex -> (Distances, ParentsMap)
 dijkstra graph cost start = go initialState
  where
   initialState :: DijkstraState =
-    ( Set.empty
-    , Map.singleton start 0
+    ( IntSet.empty
+    , IntMap.singleton start 0
     , Heap.singleton (Heap.Entry 0 start)
-    , Map.empty
+    , IntMap.empty
     )
 
   go :: DijkstraState -> (Distances, ParentsMap)
@@ -122,7 +134,7 @@ dijkstra graph cost start = go initialState
       if v ∈ visited
         then go (visited, distances, queue', parents)
         else
-          let visited' = Set.insert v visited
+          let visited' = IntSet.insert v visited
               neighbors = graph ! v
               unvisitedNeighbors = filter (∉ visited) neighbors
               s' :: DijkstraState = (visited', distances, queue', parents)
@@ -130,8 +142,8 @@ dijkstra graph cost start = go initialState
 
   foldNeighbor :: Vertex -> Vertex -> DijkstraState -> DijkstraState
   foldNeighbor v v' s@(visited, distances, queue, parents) = case compare alt d of
-    LT -> (visited, Map.insert v' alt distances, Heap.insert (Heap.Entry alt v') queue, Map.insert v' [v] parents)
-    EQ -> (visited, distances, queue, Map.adjust (v :) v' parents)
+    LT -> (visited, IntMap.insert v' alt distances, Heap.insert (Heap.Entry alt v') queue, IntMap.insert v' [v] parents)
+    EQ -> (visited, distances, queue, IntMap.adjust (v :) v' parents)
     GT -> s
    where
     alt = distances !?? v + cost (v, v')
@@ -141,7 +153,7 @@ shortestDistance :: [Vertex] -> (Distances, ParentsMap) -> Distance Int
 shortestDistance targets (distances, _) = minimum ((distances !??) <$> targets)
 
 buildPathTree :: ParentsMap -> Vertex -> Tree Vertex
-buildPathTree parentsMap = unfoldTree (\v -> (v, concat $ parentsMap Map.!? v))
+buildPathTree parentsMap = unfoldTree (\v -> (v, concat $ parentsMap IntMap.!? v))
 
 allShortestPaths :: [Vertex] -> (Distances, ParentsMap) -> [Tree Vertex]
 allShortestPaths targets s@(distances, parents) = map (buildPathTree parents) . filter isShortestTarget $ targets
@@ -183,5 +195,5 @@ solve (wallGrid, startPos, endPos) = ((,) <$> part1 <*> part2) (dijkstra graph c
 main :: IO ()
 main = do
   input <- parseInput <$> getContents
-  print input
+  -- print input
   print $ solve input
