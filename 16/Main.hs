@@ -4,6 +4,7 @@ module Main where
 
 import Control.Lens hiding (children)
 import Data.Array.Unboxed
+import Data.Containers.ListUtils (nubOrd)
 import Data.Graph
 import Data.Heap (Heap)
 import Data.Heap qualified as Heap
@@ -12,6 +13,7 @@ import Data.Map qualified as Map
 import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Data.Tree (flatten, unfoldTree)
 
 type Coordinates = (Int, Int)
 type WallGrid = Set Coordinates
@@ -96,75 +98,90 @@ move West (x, y) = (x, y - 1)
 (!??) :: (Ord k) => Map k (Distance a) -> k -> Distance a
 (!??) m k = Map.findWithDefault Infinity k m
 
-type DijkstraState = (Set Vertex, Map Vertex (Distance Int), Heap (Heap.Entry (Distance Int) Vertex))
+type Distances = Map Vertex (Distance Int)
+type Queue = Heap (Heap.Entry (Distance Int) Vertex)
+type ParentsMap = Map Vertex [Vertex]
+type DijkstraState = (Set Vertex, Distances, Queue, ParentsMap)
 type CostFn = Edge -> Distance Int
 type Key = (Coordinates, Direction)
 
-dijkstra :: Graph -> CostFn -> Vertex -> Set Vertex -> Map Vertex (Distance Int)
-dijkstra graph cost start targetSet = go initialState
+dijkstra :: Graph -> CostFn -> Vertex -> (Distances, ParentsMap)
+dijkstra graph cost start = go initialState
  where
-  initialVisited = Set.empty
-  initialDistances = Map.singleton start 0
-  initialQueue = Heap.singleton (Heap.Entry 0 start)
-  initialState :: DijkstraState = (initialVisited, initialDistances, initialQueue)
+  initialState :: DijkstraState =
+    ( Set.empty
+    , Map.singleton start 0
+    , Heap.singleton (Heap.Entry 0 start)
+    , Map.empty
+    )
 
-  go :: DijkstraState -> Map Vertex (Distance Int)
-  go (visited, distances, queue) = case Heap.viewMin queue of
-    Nothing -> distances
+  go :: DijkstraState -> (Distances, ParentsMap)
+  go (visited, distances, queue, parents) = case Heap.viewMin queue of
+    Nothing -> (distances, parents)
     Just (Heap.Entry d v, queue') ->
-      -- early exit
-      if v ∈ targetSet
-        then distances
+      if v ∈ visited
+        then go (visited, distances, queue', parents)
         else
-          if v ∈ visited
-            then go (visited, distances, queue')
-            else
-              -- update the visited set
-              let visited' = Set.insert v visited
-                  -- update the distances map
-                  neighbors = graph ! v
-                  unvisitedNeighbors = filter (∉ visited) neighbors
-                  s' :: DijkstraState = (visited', distances, queue')
-               in go $ foldr (foldNeighbor v) s' unvisitedNeighbors
+          let visited' = Set.insert v visited
+              neighbors = graph ! v
+              unvisitedNeighbors = filter (∉ visited) neighbors
+              s' :: DijkstraState = (visited', distances, queue', parents)
+           in go $ foldr (foldNeighbor v) s' unvisitedNeighbors
 
   foldNeighbor :: Vertex -> Vertex -> DijkstraState -> DijkstraState
-  foldNeighbor v v' s@(visited, distances, queue) =
-    if alt < d
-      then (visited, Map.insert v' alt distances, Heap.insert (Heap.Entry alt v') queue)
-      else s
+  foldNeighbor v v' s@(visited, distances, queue, parents) = case compare alt d of
+    LT -> (visited, Map.insert v' alt distances, Heap.insert (Heap.Entry alt v') queue, Map.insert v' [v] parents)
+    EQ -> (visited, distances, queue, Map.adjust (v :) v' parents)
+    GT -> s
    where
     alt = distances !?? v + cost (v, v')
     d = distances !?? v'
 
-findShortestDistance :: Graph -> CostFn -> Vertex -> Set Vertex -> Distance Int
-findShortestDistance graph cost start targetSet = minimum ((distances !??) <$> Set.toList targetSet)
- where
-  distances = dijkstra graph cost start targetSet
+shortestDistance :: [Vertex] -> (Distances, ParentsMap) -> Distance Int
+shortestDistance targets (distances, _) = minimum ((distances !??) <$> targets)
 
-solve1 :: Input -> Distance Int
-solve1 (wallGrid, startPos, endPos) = findShortestDistance graph costFromEdge start targetSet
+buildPathTree :: ParentsMap -> Vertex -> Tree Vertex
+buildPathTree parentsMap = unfoldTree (\v -> (v, concat $ parentsMap Map.!? v))
+
+allShortestPaths :: [Vertex] -> (Distances, ParentsMap) -> [Tree Vertex]
+allShortestPaths targets s@(distances, parents) = map (buildPathTree parents) . filter isShortestTarget $ targets
  where
+  minDistance = shortestDistance targets s
+  isShortestTarget :: Vertex -> Bool
+  isShortestTarget = (== minDistance) . (distances !??)
+
+solve :: Input -> (Distance Int, Int)
+solve (wallGrid, startPos, endPos) = ((,) <$> part1 <*> part2) (dijkstra graph costFromEdge start)
+ where
+  part1 = shortestDistance targets
+  part2 = countUnique . map cellFromVertex . (>>= flatten) . allShortestPaths targets
+  countUnique = length . nubOrd
+  targets = mapMaybe (vertexFromKey . (endPos,)) allDirections
   emptyGrid = negateGrid wallGrid
+
+  -- Graph construction
   (graph, nodeFromVertex, vertexFromKey) =
     graphFromEdges
       [ let key = (cell, dir) in (cell, key, children key)
       | cell <- Set.toList emptyGrid
       , dir <- allDirections
       ]
-  cost :: (Key, Key) -> Distance Int
-  cost ((u, _), (v, _)) = if u == v then 1000 else 1
-  costFromEdge :: Edge -> Distance Int
-  costFromEdge (u, v) = cost (keyFromVertex u, keyFromVertex v)
+  cellFromVertex = view _1 . nodeFromVertex
   keyFromVertex = view _2 . nodeFromVertex
-  Just start = vertexFromKey (startPos, East)
-  targetSet = Set.fromList . mapMaybe (vertexFromKey . (endPos,)) $ allDirections
   children :: Key -> [Key]
   children (cell, dir) =
     (let cell' = move dir cell in [(cell', dir) | cell' ∈ emptyGrid])
       <> [(cell, clockwise dir), (cell, counterclockwise dir)]
 
+  -- Dijkstra inputs
+  Just start = vertexFromKey (startPos, East)
+  cost :: (Key, Key) -> Distance Int
+  cost ((u, _), (v, _)) = if u == v then 1000 else 1
+  costFromEdge :: Edge -> Distance Int
+  costFromEdge (u, v) = cost (keyFromVertex u, keyFromVertex v)
+
 main :: IO ()
 main = do
   input <- parseInput <$> getContents
   print input
-  print $ solve1 input
+  print $ solve input
