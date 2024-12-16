@@ -302,3 +302,16 @@ executable 15
         mtl,
         transformers,
     hs-source-dirs:   15
+
+executable 16
+    import:           shared
+    main-is:          Main.hs
+    build-depends:    
+        base ^>=4.19.1.0,
+        containers,
+        lens,
+        array,
+        mtl,
+        transformers,
+        heaps,
+    hs-source-dirs:   16
