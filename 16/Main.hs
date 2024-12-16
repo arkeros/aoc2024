@@ -153,7 +153,7 @@ shortestDistance :: [Vertex] -> (Distances, ParentsMap) -> Distance Int
 shortestDistance targets (distances, _) = minimum ((distances !??) <$> targets)
 
 buildPathTree :: ParentsMap -> Vertex -> Tree Vertex
-buildPathTree parentsMap = unfoldTree (\v -> (v, concat $ parentsMap IntMap.!? v))
+buildPathTree parents = unfoldTree (\v -> (v, concat $ parents IntMap.!? v))
 
 allShortestPaths :: [Vertex] -> (Distances, ParentsMap) -> [Tree Vertex]
 allShortestPaths targets s@(distances, parents) = map (buildPathTree parents) . filter isShortestTarget $ targets
