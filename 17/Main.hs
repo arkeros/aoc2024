@@ -3,11 +3,13 @@
 module Main where
 
 import Control.Lens
-import Control.Monad (unless)
-import Control.Monad.RWS
+import Control.Monad (guard, unless, when)
+import Control.Monad.State.Strict
 import Data.Array.Unboxed
 import Data.Bits (xor)
+import Data.List (isPrefixOf)
 import Data.Void (Void)
+import Debug.Trace (trace)
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
@@ -22,6 +24,7 @@ data ProgramState = ProgramState
   { _registers :: (Int, Int, Int)
   , _program :: UArray Int Int
   , _pc :: Int
+  , _output :: Output
   }
 deriving instance Show ProgramState
 makeLenses ''ProgramState
@@ -48,9 +51,9 @@ inputP = do
   c <- registerP
   _ <- newline
   program <- programP
-  pure $ ProgramState (a, b, c) program 0
+  pure $ ProgramState (a, b, c) program 0 []
 
-type AppM = RWS () Output ProgramState
+type AppM = State ProgramState
 
 readLiteralOperand :: AppM Int
 readLiteralOperand = do
@@ -116,7 +119,7 @@ executeIntruction = do
       pc += 2
     OUT -> do
       operand <- readComboOperand
-      tell [operand `mod` 8]
+      output %= (++ [operand `mod` 8])
       pc += 2
     BDV -> do
       operand <- readComboOperand
@@ -141,13 +144,32 @@ runProgram = do
     runProgram
 
 solve1 :: ProgramState -> Output
-solve1 = snd . evalRWS runProgram ()
+solve1 = view output . execState runProgram
+
+isOutputPrefixOfProgram :: AppM Bool
+isOutputPrefixOfProgram = do
+  output' <- use output
+  program' <- use program
+  pure $ output' `isPrefixOf` elems program'
+
+runProgram' :: AppM ()
+runProgram' = do
+  halts <- isHalted
+  unless halts $ do
+    executeIntruction
+    isPrefix <- isOutputPrefixOfProgram
+    when isPrefix runProgram'
 
 solve2 :: ProgramState -> Int
 solve2 input = head $ do
-  a <- [0 ..]
-  let program :: ProgramState = input & registerA .~ a
-  _
+  a <- [198495833 ..]
+  let initialProgram :: ProgramState = input & registerA .~ a
+  -- execute program while the output is a prefix of the program itself
+  let finalProgram = execState runProgram' initialProgram
+  let output' = finalProgram ^. output
+  let program' = finalProgram ^. program
+  guard $ trace (show a <> show output') (output' == elems program')
+  pure a
 
 main :: IO ()
 main = do
@@ -157,3 +179,20 @@ main = do
     Right x -> do
       print x
       print $ solve1 x
+      print $ solve2 x
+
+-- 2,4 -> b = a mod 8
+-- 1,1 -> b = b xor 1
+-- 7,5 -> c = a div (2^b)
+-- 1,5 -> a = a `div` (2^b)
+-- 4,2 -> b = b `xor` c
+-- 5,5 -> output (b mod 8) (cuando es 2?)
+-- 0,3 -> a `div` (2 ^ 3)
+-- 3,0 -> jmp if a != 0 to beginning
+
+-- b = 1..7
+-- c = a div (2^(b xor 1))
+-- (b xor 1) xor c = ...010
+-- => b xor c = (...010 xor 1) = ...011
+
+-- (a mod 8) xor (a div (2^(a mod 8))) = ...011
