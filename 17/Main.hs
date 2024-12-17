@@ -3,6 +3,7 @@
 module Main where
 
 import Control.Lens
+import Control.Monad (unless)
 import Control.Monad.RWS
 import Data.Array.Unboxed
 import Data.Bits (xor)
@@ -134,8 +135,6 @@ isHalted = do
 
 runProgram :: AppM ()
 runProgram = do
-  pc' <- use pc
-  program' <- use program
   halts <- isHalted
   unless halts $ do
     executeIntruction
