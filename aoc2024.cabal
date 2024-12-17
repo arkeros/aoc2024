@@ -327,4 +327,5 @@ executable 17
         array,
         mtl,
         transformers,
+        sbv,
     hs-source-dirs:   17
