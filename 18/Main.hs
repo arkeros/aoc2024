@@ -189,8 +189,8 @@ solve wallGrid = (part1, keyFromVertex <$> part2)
       [let key = cell in (cell, key, children key) | cell <- Set.toList emptyGrid]
   children :: Key -> [Key]
   children (x, y) = [(x', y') | dir <- allDirections, let (x', y') = move dir (x, y), (x', y') ∈ emptyGrid]
-  keyFromVertex :: Vertex -> Key
-  keyFromVertex v = let (_, key, _) = nodeFromVertex v in key
+  keyFromNode (_, key, _) = key
+  keyFromVertex = keyFromNode . nodeFromVertex
 
   -- Dijkstra inputs
   Just start = vertexFromKey (0, 0)
