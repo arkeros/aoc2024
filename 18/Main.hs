@@ -188,7 +188,7 @@ solve wallGrid = (part1, keyFromVertex <$> part2)
     graphFromEdges
       [let key = cell in (cell, key, children key) | cell <- Set.toList emptyGrid]
   children :: Key -> [Key]
-  children p = [p' | dir <- allDirections, let p' = move dir p, p' ∈ emptyGrid]
+  children p = [p' | p' <- (`move` p) <$> allDirections, p' ∈ emptyGrid]
   keyFromNode (_, key, _) = key
   keyFromVertex = keyFromNode . nodeFromVertex
 
