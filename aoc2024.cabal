@@ -329,3 +329,16 @@ executable 17
         transformers,
         sbv,
     hs-source-dirs:   17
+
+executable 18
+    import:           shared
+    main-is:          Main.hs
+    build-depends:   
+        base ^>=4.19.1.0,
+        megaparsec,
+        containers,
+        array,
+        mtl,
+        transformers,
+        heaps,
+    hs-source-dirs:   18
