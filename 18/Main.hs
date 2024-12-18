@@ -3,6 +3,7 @@
 module Main where
 
 import Data.Array ((!), (//))
+import Data.Containers.ListUtils (nubOrd)
 import Data.Graph
 import Data.Heap (Heap)
 import Data.Heap qualified as Heap
@@ -15,6 +16,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Tree (unfoldTree)
 import Data.Void (Void)
+import Debug.Trace (trace)
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
@@ -167,12 +169,30 @@ removeVertex v g =
  where
   disconnected = g ! v
 
+-- | Successively remove vertices from a graph, returning the intermediate graphs
+peelGraph :: Graph -> [Vertex] -> [Graph]
+peelGraph g = drop 1 . scanl (flip removeVertex) g
+
+halve :: [a] -> ([a], [a])
+halve xs = splitAt (length xs `div` 2) xs
+
+{- | Find the first element in a list that satisfies a predicate, with binary search.
+p is monotonic. If p x = True, then p y = True for all y > x.
+-}
+search :: (a -> Bool) -> [a] -> Maybe a
+search _ [] = Nothing
+search p [x] = if p x then Just x else Nothing
+search p xs = search p (if p x then left else right)
+ where
+  (left, right) = halve xs
+  x = trace ("Binary search: " <> show (length xs)) last left
+
 solve :: Input -> (Distance Int, Maybe Coordinates)
 solve wallGrid = (part1, keyFromVertex <$> part2)
  where
   (wallHead, wallTail) = splitAt 1024 wallGrid
   part1 = shortestDistance [target] (dijkstra graph costFromEdge start)
-  part2 = findBottleNeck graph (mapMaybe vertexFromKey wallTail)
+  part2 = findBottleNeck' graph (mapMaybe vertexFromKey wallTail)
 
   findBottleNeck :: Graph -> [Vertex] -> Maybe Vertex
   findBottleNeck _ [] = Nothing
@@ -181,6 +201,14 @@ solve wallGrid = (part1, keyFromVertex <$> part2)
      in if path g' start target
           then findBottleNeck g' vs
           else Just v
+
+  -- \| Find the bottleneck, but with binary search
+  findBottleNeck' :: Graph -> [Vertex] -> Maybe Vertex
+  findBottleNeck' g0 vs = fst <$> search (\(v, g) -> not $ path g start target) xs
+   where
+    -- TODO: this binary search is very wasteful of memory
+    xs :: [(Vertex, Graph)]
+    xs = zip vs (peelGraph g0 vs)
 
   -- Graph construction
   emptyGrid = negateGrid (Set.fromList wallHead)
