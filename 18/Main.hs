@@ -178,7 +178,7 @@ solve wallGrid = (part1, keyFromVertex <$> part2)
   findBottleNeck _ [] = Nothing
   findBottleNeck g (v : vs) =
     let g' = removeVertex v g
-     in if elem target $ reachable g' start
+     in if path g' start target
           then findBottleNeck g' vs
           else Just v
 
