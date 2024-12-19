@@ -350,5 +350,6 @@ executable 19
         base,
         megaparsec,
         parallel,
-        MemoTrie,
+        containers,
+        array,
     hs-source-dirs:   19
