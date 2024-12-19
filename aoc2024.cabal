@@ -342,3 +342,13 @@ executable 18
         transformers,
         heaps,
     hs-source-dirs:   18
+
+executable 19
+    import:           shared
+    main-is:          Main.hs
+    build-depends:   
+        base,
+        megaparsec,
+        parallel,
+        MemoTrie,
+    hs-source-dirs:   19
