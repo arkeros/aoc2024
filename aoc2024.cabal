@@ -353,3 +353,16 @@ executable 19
         containers,
         array,
     hs-source-dirs:   19
+
+executable 21
+    import:           shared
+    main-is:          Main.hs
+    build-depends:    
+        base,
+        containers,
+        lens,
+        array,
+        mtl,
+        transformers,
+        heaps,
+    hs-source-dirs:   21
