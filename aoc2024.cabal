@@ -359,10 +359,6 @@ executable 21
     main-is:          Main.hs
     build-depends:    
         base,
-        containers,
         lens,
-        array,
-        mtl,
-        transformers,
-        heaps,
+        MemoTrie,
     hs-source-dirs:   21

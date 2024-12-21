@@ -13,11 +13,12 @@ import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Data.List (inits, isPrefixOf)
+import Data.List (inits, isPrefixOf, permutations)
 import Data.Maybe (mapMaybe)
+import Data.MemoTrie (memoFix)
 import Data.Set (Set)
 import Data.Set qualified as Set
-import Data.Tree (flatten, unfoldTree)
+import Data.Tree (unfoldTree)
 
 type Coordinates = (Int, Int)
 type Input = [String]
@@ -77,6 +78,11 @@ move South (x, y) = (x + 1, y)
 move East (x, y) = (x, y + 1)
 move West (x, y) = (x, y - 1)
 
+dirFromVector :: Coordinates -> Direction
+dirFromVector (-1, 0) = North
+dirFromVector (1, 0) = South
+dirFromVector (0, 1) = East
+dirFromVector (0, -1) = West
 class BelongsTo t a where
   (∈) :: a -> t -> Bool
   (∉) :: a -> t -> Bool
@@ -251,7 +257,7 @@ tailChain = lens getter setter
  where
   getter (x : xs, y) = (xs, y)
   getter _ = error "waka: empty chain"
-  setter (x0 : _, y) (xs, y') = (x0 : xs, y')
+  setter (x0 : _, y) (xs, y') = (x0 <| xs, y')
 
 moveChain :: DirectionalKeypad -> StateT ChainState Maybe (Maybe NumericKeypad)
 moveChain buttonHuman = do
@@ -316,8 +322,67 @@ solve1 = sum . map complexity
   unDist (Dist x) = x
   unDist Infinity = error "unDist: Infinity"
 
+manhattan :: Coordinates -> Coordinates -> Distance Int
+manhattan p q = Dist (abs vx + abs vy)
+ where
+  (vx, vy) = p ^-^ q
+
+(^-^) :: Coordinates -> Coordinates -> Coordinates
+(x, y) ^-^ (x', y') = (x - x', y - y')
+
+removeNothings :: [Maybe a] -> [Maybe a]
+removeNothings = filter (not . null)
+
+-- Use dynamic programming to solve the sequence problem
+solveSeqDP :: String -> Distance Int
+solveSeqDP str = sum . map (\(src, dst) -> dist (src, dst, 0)) $ (zip ((fromNumericButton 'A') : plis) plis)
+ where
+  plis = map fromNumericButton str
+
+  -- Distance from src to target, at layer i
+  dist :: (Coordinates, Coordinates, Int) -> Distance Int
+  dist = memoFix $ \f (src, target, i) -> case i of
+    0 -> shortestDistance isTarget (dijkstra graph costFromEdge start)
+     where
+      isTarget :: Vertex -> Bool
+      isTarget = (== toNumericButton target) . view _2 . nodeFromVertex
+      -- Graph construction
+      (graph, nodeFromVertex, vertexFromKey) =
+        graphFromEdges
+          ( (Nothing, Nothing, children Nothing)
+              : [(Just (fromNumericButton x), Just x, children (Just x)) | x <- allNumericButtons]
+          )
+      keyFromVertex :: Vertex -> Maybe NumericKeypad
+      keyFromVertex = view _2 . nodeFromVertex
+      cost :: (Maybe Coordinates, Maybe Coordinates) -> Distance Int
+      cost (Nothing, _) = error "cost: Nothing"
+      cost (_, Nothing) = error "cost: Nothing"
+      cost (Just p, Just q) = let dir = dirFromVector (q ^-^ p) in _
+      costFromEdge :: Edge -> Distance Int
+      costFromEdge (u, v) = cost (coordFromVertex u, coordFromVertex v)
+      coordFromVertex :: Vertex -> Maybe Coordinates
+      coordFromVertex = view _1 . nodeFromVertex
+      children :: Maybe NumericKeypad -> [Maybe NumericKeypad]
+      children Nothing = []
+      children (Just x) = removeNothings (toNumericButton . (`move` (fromNumericButton x)) <$> allDirections)
+      Just start = vertexFromKey (toNumericButton src)
+    2 -> 1 + manhattan src target
+    n -> minimum (d <$> paths)
+     where
+      v = target ^-^ src
+      verticals = replicate (abs (fst v)) (dirFromVector (signum (fst v), 0))
+      horizontals = replicate (abs (snd v)) (dirFromVector (0, signum (snd v)))
+      paths = filter isGoodPath $ permutations (verticals <> horizontals)
+      d :: [Direction] -> Distance Int
+      d = sum . map (\dir -> f (move dir src, target, n + 1))
+      isGoodPath :: [Direction] -> Bool
+      isGoodPath path = all (/= (0, 0)) coords
+       where
+        coords = scanl (flip move) src path
+
 main :: IO ()
 main = do
   let input = ["869A", "170A", "319A", "349A", "489A"]
   print $ solveSeq "029A"
+  print $ solveSeqDP 2 "029A"
   print $ solve1 input
