@@ -25,6 +25,9 @@ inputP = edge `sepBy` newline
   computer = count 2 alphaNumChar
   edge = (,) <$> computer <* char '-' <*> computer
 
+(∈) :: (Ord a) => a -> Set a -> Bool
+(∈) = Set.member
+
 -- solve2 :: Input -> Int
 solve input = (part1, part2)
  where
@@ -35,15 +38,15 @@ solve input = (part1, part2)
   startsWithT = ("t" `isPrefixOf`)
 
   computers = sort . nubOrd . (>>= (\(a, b) -> [a, b])) $ input
-  edgeSet :: Set Edge
-  edgeSet = Set.fromList . (>>= (\(a, b) -> [(a, b), (b, a)])) $ input
+  edges :: Set Edge
+  edges = Set.fromList . (>>= (\(a, b) -> [(a, b), (b, a)])) $ input
   combinations :: Int -> [[Computer]]
   combinations = memoFix $ \f k -> case k of
     0 -> [[]]
     1 -> pure <$> computers
     n -> [x : xs | x <- computers, xs <- f (n - 1), x < head xs, all (isConnected x) xs]
   isConnected :: Computer -> Computer -> Bool
-  isConnected a b = (a, b) `Set.member` edgeSet
+  isConnected a b = (a, b) ∈ edges
   {-# INLINE isConnected #-}
 
 main :: IO ()
