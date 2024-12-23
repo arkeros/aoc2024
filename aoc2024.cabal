@@ -362,3 +362,30 @@ executable 21
         lens,
         MemoTrie,
     hs-source-dirs:   21
+
+executable 22
+    import:           shared
+    main-is:          Main.hs
+    build-depends:   
+        base,
+        megaparsec,
+        containers,
+        array,
+        mtl,
+        transformers,
+        parallel,
+    hs-source-dirs:   22
+
+executable 23
+    import:           shared
+    main-is:          Main.hs
+    build-depends:   
+        base,
+        megaparsec,
+        containers,
+        array,
+        mtl,
+        transformers,
+        parallel,
+        lens,
+    hs-source-dirs:   23
