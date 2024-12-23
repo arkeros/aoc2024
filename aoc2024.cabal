@@ -383,9 +383,6 @@ executable 23
         base,
         megaparsec,
         containers,
-        array,
-        mtl,
-        transformers,
         parallel,
-        lens,
+        MemoTrie,
     hs-source-dirs:   23
