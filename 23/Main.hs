@@ -4,11 +4,12 @@ module Main where
 
 import Data.Containers.ListUtils (nubOrd)
 import Data.List (isPrefixOf, sort)
+import Data.List.NonEmpty (NonEmpty (..), (<|))
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.MemoTrie (memoFix)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Void (Void)
-import Debug.Trace (trace)
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
@@ -28,23 +29,23 @@ inputP = edge `sepBy` newline
 (∈) :: (Ord a) => a -> Set a -> Bool
 (∈) = Set.member
 
--- solve2 :: Input -> Int
+join :: (Foldable t) => String -> t String -> String
+join sep = foldr1 (\a b -> a <> sep <> b)
+
+solve :: Input -> (Int, String)
 solve input = (part1, part2)
  where
-  part1 = length . filter (any startsWithT) $ combinations 3
-  -- part2 is the last non-empty list of combinations
-  part2 = last . takeWhile (not . null) $ combinations <$> [2 ..]
-
+  part1 = length . filter (any startsWithT) $ cliques 3
+  -- part2 is the last non-empty list of cliques
+  part2 = join "," . head . last . takeWhile (not . null) $ cliques <$> [2 ..]
   startsWithT = ("t" `isPrefixOf`)
-
   computers = sort . nubOrd . (>>= (\(a, b) -> [a, b])) $ input
   edges :: Set Edge
   edges = Set.fromList . (>>= (\(a, b) -> [(a, b), (b, a)])) $ input
-  combinations :: Int -> [[Computer]]
-  combinations = memoFix $ \f k -> case k of
-    0 -> [[]]
+  cliques :: Int -> [NonEmpty Computer]
+  cliques = memoFix $ \f k -> case k of
     1 -> pure <$> computers
-    n -> [x : xs | x <- computers, xs <- f (n - 1), x < head xs, all (isConnected x) xs]
+    n -> [(x <| xs) | x <- computers, xs <- f (n - 1), x < NonEmpty.head xs, all (isConnected x) xs]
   isConnected :: Computer -> Computer -> Bool
   isConnected a b = (a, b) ∈ edges
   {-# INLINE isConnected #-}
