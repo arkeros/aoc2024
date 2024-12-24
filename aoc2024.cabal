@@ -354,6 +354,16 @@ executable 19
         array,
     hs-source-dirs:   19
 
+executable 20
+    import:           shared
+    main-is:          Main.hs
+    build-depends:   
+        base,
+        containers,
+        array,
+        heaps,
+    hs-source-dirs:   20
+
 executable 21
     import:           shared
     main-is:          Main.hs
