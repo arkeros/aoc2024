@@ -386,3 +386,14 @@ executable 23
         parallel,
         MemoTrie,
     hs-source-dirs:   23
+
+executable 24
+    import:           shared
+    main-is:          Main.hs
+    build-depends:    
+        base,
+        megaparsec,
+        containers,
+        lens,
+        array,
+    hs-source-dirs:   24
