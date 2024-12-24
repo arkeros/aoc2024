@@ -29,7 +29,7 @@ inputP = edge `sepBy` newline
 (∈) :: (Ord a) => a -> Set a -> Bool
 (∈) = Set.member
 
-join :: (Foldable t) => String -> t String -> String
+join :: (Foldable t, Monoid a) => a -> t a -> a
 join sep = foldr1 (\a b -> a <> sep <> b)
 
 solve :: Input -> (Int, String)
