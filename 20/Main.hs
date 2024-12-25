@@ -3,7 +3,6 @@
 module Main where
 
 import Data.Array.Unboxed
-import Data.Bifunctor (Bifunctor (..))
 import Data.Graph
 import Data.Heap (Heap)
 import Data.Heap qualified as Heap
@@ -14,8 +13,6 @@ import Data.IntSet qualified as IntSet
 import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
-import Data.Tree (unfoldTree)
-import Debug.Trace (trace)
 
 type Coordinates = (Int, Int)
 type WallGrid = [Coordinates]
@@ -152,51 +149,56 @@ dijkstra graph cost start = go initialState
 shortestDistance :: [Vertex] -> (Distances, ParentsMap) -> Distance Int
 shortestDistance targets (distances, _) = minimum ((distances !??) <$> targets)
 
-buildPathTree :: ParentsMap -> Vertex -> Tree Vertex
-buildPathTree parents = unfoldTree (\v -> (v, concat $ parents IntMap.!? v))
+manhattan :: Coordinates -> Coordinates -> Distance Int
+manhattan (x1, y1) (x2, y2) = Dist $ abs (x1 - x2) + abs (y1 - y2)
 
-solve1 :: Input -> Int
-solve1 (walls, src, target) = length . filter ((<= cheatlessDistance - 100) . fst) . map (\edge -> (distThrough edge, edge)) $ cheats
+zipMaybe :: (Maybe a, Maybe b) -> Maybe (a, b)
+zipMaybe (Just a, Just b) = Just (a, b)
+zipMaybe _ = Nothing
+
+circle :: Int -> Coordinates -> [Coordinates]
+circle r (x, y) = [(x + dx, y + dy) | dx <- [-r .. r], dy <- [-r .. r], abs dx + abs dy <= r]
+
+solve :: Input -> (Int, Int)
+solve (walls, src, target) = (summary $ cheats 2, summary $ cheats 20)
  where
-  (distances, parents) = (dijkstra graph costFromEdge start)
-  (distancesFromEnd, parentsFromEnd) = (dijkstra graph costFromEdge end)
-  cheatlessDistance = shortestDistance [endCheatless] (distances, parents)
-  cheatDistance = shortestDistance [end] (distances, parents)
-  cheats :: [Edge] =
-    (>>= (\u -> map (u,) $ graph ! u))
-      . mapMaybe vertexFromKey
-      $ [(cell, 1) | cell <- Set.toList wallGrid]
+  summary :: [Edge] -> Int
+  summary = length . filter ((<= cheatlessDistance - 100) . fst) . map (\edge -> (distThrough edge, edge))
+
+  (distances, parents) = dijkstra graph cost start
+  (distancesFromEnd, parentsFromEnd) = dijkstra graph cost end
+  cheatlessDistance = shortestDistance [end] (distances, parents)
+
+  cheats :: Int -> [Edge]
+  cheats d =
+    mapMaybe (\(u, v) -> zipMaybe (vertexFromKey u, vertexFromKey v))
+      . (>>= (\u -> (u,) <$> circle d u))
+      $ [cell | cell <- Set.toList emptyGrid]
 
   distThrough :: Edge -> Distance Int
-  distThrough (u, v) = distances !?? u + 1 + distancesFromEnd !?? v
+  distThrough (u, v) =
+    distances !?? u
+      + (manhattan (keyFromVertex u) (keyFromVertex v))
+      + distancesFromEnd !?? v
 
   -- Graph construction
   wallGrid = Set.fromList walls
   emptyGrid = negateGrid wallGrid
   (graph, nodeFromVertex, vertexFromKey) =
-    graphFromEdges $
-      [let key = (cell, 2) in (cell, key, children key) | cell <- Set.toList emptyGrid]
-        <> [let key = (cell, 0) in (cell, key, children key) | cell <- Set.toList emptyGrid]
-        <> [let key = (cell, 1) in (cell, key, children key) | cell <- Set.toList wallGrid]
-  children :: Key -> [Key]
-  children (p, 0) = [(p', 0) | p' <- (`move` p) <$> allDirections, p' ∈ emptyGrid]
-  children (p, 1) = children (p, 0)
-  children (p, 2) =
-    [(p', 2) | p' <- (`move` p) <$> allDirections, p' ∈ emptyGrid]
-      <> [(p', 1) | p' <- (`move` p) <$> allDirections, p' ∈ wallGrid]
-  children (p, n) = error $ "invalid key: " <> show n
+    graphFromEdges [(key, key, children key) | key <- Set.toList emptyGrid]
+  children :: Coordinates -> [Coordinates]
+  children p = [p' | p' <- (`move` p) <$> allDirections, p' ∈ emptyGrid]
   keyFromNode (_, key, _) = key
   keyFromVertex = keyFromNode . nodeFromVertex
 
   -- Dijkstra inputs
-  Just start = vertexFromKey (src, 2)
-  Just end = vertexFromKey (target, 0)
-  Just endCheatless = vertexFromKey (target, 2)
-  costFromEdge :: Edge -> Distance Int
-  costFromEdge = const 1
+  Just start = vertexFromKey src
+  Just end = vertexFromKey target
+  cost :: Edge -> Distance Int
+  cost = const 1
 
 main :: IO ()
 main = do
   input <- parseInput <$> getContents
   -- print input
-  print $ solve1 input
+  print $ solve input
